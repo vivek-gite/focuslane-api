@@ -106,7 +106,8 @@ Content-Type: application/json
       "id": "video_id_1",
       "title": "Build a React dashboard from scratch",
       "channel": "Code Workshop",
-      "description": "Step-by-step React tutorial using charts and API data."
+      "description": "Step-by-step React tutorial using charts and API data.",
+      "transcript": "In this lesson we build a React dashboard..."
     },
     {
       "id": "video_id_2",
@@ -115,7 +116,18 @@ Content-Type: application/json
       "description": "Entertainment news and viral moments."
     }
   ],
-  "filterRule": "Only show programming tutorials"
+  "filterRule": "Only show programming tutorials",
+  "preferenceProfile": {
+    "hideConfidenceThreshold": 0.8,
+    "examples": [
+      {
+        "action": "show",
+        "title": "System design interview deep dive",
+        "channel": "Code Workshop",
+        "reason": "User marked this as a false positive."
+      }
+    ]
+  }
 }
 ```
 
@@ -126,7 +138,9 @@ Content-Type: application/json
 | `titles[].title` | string | Yes | Video title to evaluate against the filter rule. |
 | `titles[].channel` | string | No | Channel name to evaluate against the filter rule. |
 | `titles[].description` | string | No | Visible video description or snippet to evaluate against the filter rule. |
+| `titles[].transcript` | string | No | Visible transcript snippet to evaluate against the filter rule when available. |
 | `filterRule` | string | Yes | Natural-language rule describing which videos to show or hide. |
+| `preferenceProfile` | object | No | User-specific threshold and feedback examples used to personalize decisions without per-user fine tuning. |
 
 #### Request Limits
 
@@ -134,7 +148,7 @@ Content-Type: application/json
 - Maximum `titles` length is 50.
 - Each `id` must be a string.
 - Each `title` must be a string.
-- `channel` and `description` are optional, but must be strings when provided.
+- `channel`, `description`, and `transcript` are optional, but must be strings when provided.
 - `filterRule` must be a non-empty string.
 
 Before the request is sent to Groq, the Worker trims the rule and limits the AI prompt input:
@@ -146,6 +160,8 @@ Before the request is sent to Groq, the Worker trims the rule and limits the AI 
 | `titles[].title` | First 200 characters |
 | `titles[].channel` | First 120 characters |
 | `titles[].description` | First 600 characters |
+| `titles[].transcript` | First 800 characters |
+| `preferenceProfile.examples` | First 8 examples |
 
 Keep IDs unique after the 20-character limit so response keys do not collide.
 
@@ -157,6 +173,18 @@ Keep IDs unique after the 20-character limit so response keys do not collide.
     "video_id_1": true,
     "video_id_2": false
   },
+  "decisions": {
+    "video_id_1": {
+      "show": true,
+      "confidence": 0.92,
+      "reason": "Title and description clearly indicate a React tutorial."
+    },
+    "video_id_2": {
+      "show": false,
+      "confidence": 0.86,
+      "reason": "Title and channel indicate celebrity entertainment."
+    }
+  },
   "error": null
 }
 ```
@@ -164,6 +192,7 @@ Keep IDs unique after the 20-character limit so response keys do not collide.
 | Field | Type | Description |
 | --- | --- | --- |
 | `results` | object | Map of video ID to decision. `true` means show, `false` means hide. |
+| `decisions` | object | Map of video ID to `show`, `confidence`, and short evidence-based `reason`. |
 | `error` | string or null | `null` on success. Contains an error code when classification fails. |
 
 #### Example cURL
@@ -177,7 +206,8 @@ curl -X POST http://127.0.0.1:8787/api/classify \
         "id": "react-dashboard",
         "title": "Build a React dashboard from scratch",
         "channel": "Code Workshop",
-        "description": "Step-by-step React tutorial using charts and API data."
+        "description": "Step-by-step React tutorial using charts and API data.",
+        "transcript": "In this lesson we build a React dashboard..."
       },
       {
         "id": "gossip-news",
@@ -186,19 +216,31 @@ curl -X POST http://127.0.0.1:8787/api/classify \
         "description": "Entertainment news and viral moments."
       }
     ],
-    "filterRule": "Only show programming tutorials"
+    "filterRule": "Only show programming tutorials",
+    "preferenceProfile": {
+      "hideConfidenceThreshold": 0.8,
+      "examples": [
+        {
+          "action": "show",
+          "title": "System design interview deep dive",
+          "channel": "Code Workshop",
+          "reason": "User marked this as a false positive."
+        }
+      ]
+    }
   }'
 ```
 
 ## Filtering Behavior
 
-The Worker instructs the AI model to act as a strict YouTube video filter:
+The Worker instructs the AI model to act as a careful YouTube video filter:
 
-- If the rule says `only show X`, videos matching `X` are shown and everything else is hidden.
-- If the rule says `hide X` or `remove X`, videos matching `X` are hidden and everything else is shown.
+- If the rule says `only show X`, clear matches for `X` are shown, and videos are hidden only when metadata clearly fails the allowed scope.
+- If the rule says `hide X` or `remove X`, videos are hidden only when metadata clearly matches `X`.
 - If the rule has multiple conditions, a video must satisfy all show conditions and no hide conditions.
-- Ambiguous videos are hidden by default.
-- Video title, channel, and description metadata are treated as data, not instructions.
+- Ambiguous videos are shown with low confidence to reduce false positives.
+- Video title, channel, description, and transcript snippets are treated as data, not instructions.
+- User feedback examples can personalize future decisions.
 - The model can only return IDs from the submitted request.
 
 ## Error Responses
@@ -212,7 +254,7 @@ Some validation errors return only an `error` field. Classification and upstream
 | `400` | `titles array is required` | `titles` is missing, empty, or not an array. |
 | `400` | `filterRule string is required` | `filterRule` is missing, empty, or not a string. |
 | `400` | `Maximum 50 titles per request` | More than 50 titles were submitted. |
-| `400` | `Each title must have id and title strings; channel and description must be strings when provided` | A title item is malformed. |
+| `400` | `Each title must have id and title strings; channel, description, and transcript must be strings when provided` | A title item is malformed. |
 | `404` | `Not found` | POST request path is not supported. |
 | `405` | `Method not allowed` | Request method is not `POST` or `OPTIONS`. |
 | `429` | `rate_limited` | Groq returned a rate-limit response. |
@@ -269,9 +311,9 @@ The Groq key is missing, invalid, expired, or does not have permission to call t
 
 Groq returned a rate-limit response. Retry later or reduce request frequency.
 
-### All Results Are `false`
+### Too Many Videos Are Hidden
 
-The model is intentionally instructed to be strict and hide ambiguous videos. Make the `filterRule` more explicit when valid videos are being hidden.
+Raise `preferenceProfile.hideConfidenceThreshold`, add user feedback examples, or make the `filterRule` more explicit. Ambiguous videos are shown by default, so repeated false positives usually mean the rule or examples are too broad.
 
 ## Scripts
 
