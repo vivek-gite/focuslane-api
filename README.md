@@ -18,11 +18,11 @@ The service accepts a batch of video titles plus a user-defined filter rule, sen
 
 ```text
 .
-├── .github/workflows/deploy.yml  # Deploys the Worker from GitHub Actions
-├── src/index.js                  # Worker entrypoint and API implementation
-├── package.json                  # npm scripts and Wrangler dependency
-├── wrangler.toml                 # Cloudflare Worker configuration
-└── README.md                     # Project documentation
+|-- .github/workflows/deploy.yml  # Deploys the Worker from GitHub Actions
+|-- src/index.js                  # Worker entrypoint and API implementation
+|-- package.json                  # npm scripts and Wrangler dependency
+|-- wrangler.toml                 # Cloudflare Worker configuration
+`-- README.md                     # Project documentation
 ```
 
 ## Requirements
@@ -260,4 +260,3 @@ The model is intentionally instructed to be strict and hide ambiguous videos. Ma
 | --- | --- |
 | `npm run dev` | Start the local Worker with Wrangler. |
 | `npm run deploy` | Deploy the Worker to Cloudflare. |
-
