@@ -55,10 +55,9 @@ async function handleClassify(request, env) {
       typeof item.id !== "string" ||
       typeof item.title !== "string" ||
       (item.channel !== undefined && typeof item.channel !== "string") ||
-      (item.description !== undefined && typeof item.description !== "string") ||
-      (item.transcript !== undefined && typeof item.transcript !== "string")
+      (item.description !== undefined && typeof item.description !== "string")
     ) {
-      return jsonResponse({ error: "Each title must have id and title strings; channel, description, and transcript must be strings when provided" }, 400);
+      return jsonResponse({ error: "Each title must have id and title strings; channel and description must be strings when provided" }, 400);
     }
   }
 
@@ -69,16 +68,14 @@ async function handleClassify(request, env) {
     id: t.id.slice(0, 20),
     title: t.title.slice(0, 200),
     channel: (t.channel || "").slice(0, 120),
-    description: (t.description || "").slice(0, 600),
-    transcript: (t.transcript || "").slice(0, 800)
+    description: (t.description || "").slice(0, 600)
   }));
 
   const titlesStr = sanitizedTitles.map((t) => [
     `- id: ${JSON.stringify(t.id)}`,
     `  title: ${JSON.stringify(t.title)}`,
     `  channel: ${JSON.stringify(t.channel)}`,
-    `  description: ${JSON.stringify(t.description)}`,
-    `  transcript: ${JSON.stringify(t.transcript)}`
+    `  description: ${JSON.stringify(t.description)}`
   ].join("\n")).join("\n");
   const allowedIds = [...new Set(sanitizedTitles.map((t) => t.id))];
   const preferenceStr = formatPreferenceProfile(sanitizedPreferenceProfile);
@@ -96,7 +93,7 @@ INSTRUCTIONS:
 - If the rule says "only show X", show clear matches for X. Hide only when the metadata clearly fails the allowed scope.
 - If the rule says "hide", "block", or "remove X", hide only videos with clear evidence that they match X. Show uncertain cases.
 - If the rule has multiple conditions, a video must satisfy all show conditions and no hide conditions.
-- Use the submitted title, channel name, description, and transcript snippets when available.
+- Use the submitted title, channel name, and description when available.
 - Do not invent facts beyond the submitted metadata.
 - If evidence is weak or ambiguous, set show to true with low confidence instead of hiding.
 - Use confidence from 0 to 1. Use confidence >= ${hideConfidenceThreshold.toFixed(2)} only when there is direct evidence in the submitted metadata.
