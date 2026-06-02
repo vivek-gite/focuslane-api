@@ -106,8 +106,7 @@ Content-Type: application/json
       "id": "video_id_1",
       "title": "Build a React dashboard from scratch",
       "channel": "Code Workshop",
-      "description": "Step-by-step React tutorial using charts and API data.",
-      "transcript": "In this lesson we build a React dashboard..."
+      "description": "Step-by-step React tutorial using charts and API data."
     },
     {
       "id": "video_id_2",
@@ -138,7 +137,6 @@ Content-Type: application/json
 | `titles[].title` | string | Yes | Video title to evaluate against the filter rule. |
 | `titles[].channel` | string | No | Channel name to evaluate against the filter rule. |
 | `titles[].description` | string | No | Visible video description or snippet to evaluate against the filter rule. |
-| `titles[].transcript` | string | No | Visible transcript snippet to evaluate against the filter rule when available. |
 | `filterRule` | string | Yes | Natural-language rule describing which videos to show or hide. |
 | `preferenceProfile` | object | No | User-specific threshold and feedback examples used to personalize decisions without per-user fine tuning. |
 
@@ -148,7 +146,7 @@ Content-Type: application/json
 - Maximum `titles` length is 50.
 - Each `id` must be a string.
 - Each `title` must be a string.
-- `channel`, `description`, and `transcript` are optional, but must be strings when provided.
+- `channel` and `description` are optional, but must be strings when provided.
 - `filterRule` must be a non-empty string.
 
 Before the request is sent to Groq, the Worker trims the rule and limits the AI prompt input:
@@ -160,7 +158,6 @@ Before the request is sent to Groq, the Worker trims the rule and limits the AI 
 | `titles[].title` | First 200 characters |
 | `titles[].channel` | First 120 characters |
 | `titles[].description` | First 600 characters |
-| `titles[].transcript` | First 800 characters |
 | `preferenceProfile.examples` | First 8 examples |
 
 Keep IDs unique after the 20-character limit so response keys do not collide.
@@ -206,8 +203,7 @@ curl -X POST http://127.0.0.1:8787/api/classify \
         "id": "react-dashboard",
         "title": "Build a React dashboard from scratch",
         "channel": "Code Workshop",
-        "description": "Step-by-step React tutorial using charts and API data.",
-        "transcript": "In this lesson we build a React dashboard..."
+        "description": "Step-by-step React tutorial using charts and API data."
       },
       {
         "id": "gossip-news",
@@ -239,7 +235,7 @@ The Worker instructs the AI model to act as a careful YouTube video filter:
 - If the rule says `hide X` or `remove X`, videos are hidden only when metadata clearly matches `X`.
 - If the rule has multiple conditions, a video must satisfy all show conditions and no hide conditions.
 - Ambiguous videos are shown with low confidence to reduce false positives.
-- Video title, channel, description, and transcript snippets are treated as data, not instructions.
+- Video title, channel, and description are treated as data, not instructions.
 - User feedback examples can personalize future decisions.
 - The model can only return IDs from the submitted request.
 
@@ -254,7 +250,7 @@ Some validation errors return only an `error` field. Classification and upstream
 | `400` | `titles array is required` | `titles` is missing, empty, or not an array. |
 | `400` | `filterRule string is required` | `filterRule` is missing, empty, or not a string. |
 | `400` | `Maximum 50 titles per request` | More than 50 titles were submitted. |
-| `400` | `Each title must have id and title strings; channel, description, and transcript must be strings when provided` | A title item is malformed. |
+| `400` | `Each title must have id and title strings; channel and description must be strings when provided` | A title item is malformed. |
 | `404` | `Not found` | POST request path is not supported. |
 | `405` | `Method not allowed` | Request method is not `POST` or `OPTIONS`. |
 | `429` | `rate_limited` | Groq returned a rate-limit response. |
