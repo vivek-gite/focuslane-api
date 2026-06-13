@@ -2,11 +2,12 @@
   "name": "focuslane-api",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
   },
-  "devDependencies": {
-    "wrangler": "^4.95.0"
+  "dependencies": {
+    "express": "^4.21.2"
   }
 }

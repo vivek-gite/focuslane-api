@@ -1,52 +1,59 @@
+import express from "express";
+
 const AI_MODEL = "openai/gpt-oss-120b";
 const DEFAULT_HIDE_CONFIDENCE_THRESHOLD = 0.75;
 const MAX_PREFERENCE_EXAMPLES = 8;
 
-export default {
-  async fetch(request, env) {
-    if (request.method === "OPTIONS") {
-      return handleCORS(request);
-    }
+const app = express();
+app.use(express.json());
 
-    if (request.method !== "POST") {
-      return jsonResponse({ error: "Method not allowed" }, 405);
-    }
-
-    const url = new URL(request.url);
-
-    if (url.pathname === "/api/classify") {
-      return handleClassify(request, env);
-    }
-
-    return jsonResponse({ error: "Not found" }, 404);
+app.use((err, req, res, next) => {
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Invalid JSON body" });
   }
-};
+  next(err);
+});
 
-async function handleClassify(request, env) {
-  const apiKey = env.GROQ_API_KEY;
+app.options("*", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  res.status(204).end();
+});
+
+app.post("/api/classify", handleClassify);
+
+app.use((req, res) => {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+  res.status(404).json({ error: "Not found" });
+});
+
+async function handleClassify(req, res) {
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return jsonResponse({ results: {}, error: "service_misconfigured" }, 500);
+    return res.status(500).json({ results: {}, error: "service_misconfigured" });
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  const body = req.body;
+  if (!body || typeof body !== "object") {
+    return res.status(400).json({ error: "Invalid JSON body" });
   }
 
   const { titles, filterRule, preferenceProfile } = body;
 
   if (!titles || !Array.isArray(titles) || titles.length === 0) {
-    return jsonResponse({ error: "titles array is required" }, 400);
+    return res.status(400).json({ error: "titles array is required" });
   }
 
   if (!filterRule || typeof filterRule !== "string" || filterRule.trim().length === 0) {
-    return jsonResponse({ error: "filterRule string is required" }, 400);
+    return res.status(400).json({ error: "filterRule string is required" });
   }
 
   if (titles.length > 50) {
-    return jsonResponse({ error: "Maximum 50 titles per request" }, 400);
+    return res.status(400).json({ error: "Maximum 50 titles per request" });
   }
 
   for (const item of titles) {
@@ -57,7 +64,7 @@ async function handleClassify(request, env) {
       (item.channel !== undefined && typeof item.channel !== "string") ||
       (item.description !== undefined && typeof item.description !== "string")
     ) {
-      return jsonResponse({ error: "Each title must have id and title strings; channel and description must be strings when provided" }, 400);
+      return res.status(400).json({ error: "Each title must have id and title strings; channel and description must be strings when provided" });
     }
   }
 
@@ -135,21 +142,10 @@ ${titlesStr}
                   items: {
                     type: "object",
                     properties: {
-                      id: {
-                        type: "string",
-                        enum: allowedIds
-                      },
-                      show: {
-                        type: "boolean"
-                      },
-                      confidence: {
-                        type: "number",
-                        minimum: 0,
-                        maximum: 1
-                      },
-                      reason: {
-                        type: "string"
-                      }
+                      id: { type: "string", enum: allowedIds },
+                      show: { type: "boolean" },
+                      confidence: { type: "number", minimum: 0, maximum: 1 },
+                      reason: { type: "string" }
                     },
                     required: ["id", "show", "confidence", "reason"],
                     additionalProperties: false
@@ -167,12 +163,12 @@ ${titlesStr}
     if (!response.ok) {
       const status = response.status;
       if (status === 401 || status === 403) {
-        return jsonResponse({ results: {}, error: "auth_error" }, 502);
+        return res.status(502).json({ results: {}, error: "auth_error" });
       }
       if (status === 429) {
-        return jsonResponse({ results: {}, error: "rate_limited" }, 429);
+        return res.status(429).json({ results: {}, error: "rate_limited" });
       }
-      return jsonResponse({ results: {}, error: `upstream_${status}` }, 502);
+      return res.status(502).json({ results: {}, error: `upstream_${status}` });
     }
 
     const data = await response.json();
@@ -190,18 +186,18 @@ ${titlesStr}
     }
 
     if (!content) {
-      return jsonResponse({ results, error: "empty_response" }, 502);
+      return res.status(502).json({ results, error: "empty_response" });
     }
 
     let parsed;
     try {
       parsed = JSON.parse(content);
     } catch {
-      return jsonResponse({ results, error: "invalid_response" }, 502);
+      return res.status(502).json({ results, error: "invalid_response" });
     }
 
     if (!Array.isArray(parsed.decisions)) {
-      return jsonResponse({ results, decisions, error: "invalid_response" }, 502);
+      return res.status(502).json({ results, decisions, error: "invalid_response" });
     }
 
     const allowedIdSet = new Set(allowedIds);
@@ -217,9 +213,9 @@ ${titlesStr}
       results[decision.id] = show;
     }
 
-    return jsonResponse({ results, decisions, error: null });
-  } catch (err) {
-    return jsonResponse({ results: {}, error: "api_error" }, 502);
+    return res.json({ results, decisions, error: null });
+  } catch {
+    return res.status(502).json({ results: {}, error: "api_error" });
   }
 }
 
@@ -270,26 +266,7 @@ function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, number));
 }
 
-function jsonResponse(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    }
-  });
-}
-
-function handleCORS(request) {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Max-Age": "86400"
-    }
-  });
-}
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`focuslane-api listening on port ${PORT}`);
+});

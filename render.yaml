@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: focuslane-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
