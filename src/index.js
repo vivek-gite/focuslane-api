@@ -1,6 +1,6 @@
 import express from "express";
 
-const AI_MODEL = "openai/gpt-oss-120b";
+const AI_MODEL = "llama-3.3-70b-versatile";
 const DEFAULT_HIDE_CONFIDENCE_THRESHOLD = 0.75;
 const MAX_PREFERENCE_EXAMPLES = 8;
 
@@ -128,7 +128,6 @@ ${titlesStr}
         ],
         temperature: 0,
         max_tokens: 4096,
-        reasoning_effort: "low",
         response_format: {
           type: "json_schema",
           json_schema: {
