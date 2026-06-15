@@ -132,7 +132,6 @@ ${titlesStr}
           type: "json_schema",
           json_schema: {
             name: "video_filter_result",
-            strict: true,
             schema: {
               type: "object",
               properties: {
@@ -141,9 +140,9 @@ ${titlesStr}
                   items: {
                     type: "object",
                     properties: {
-                      id: { type: "string", enum: allowedIds },
+                      id: { type: "string" },
                       show: { type: "boolean" },
-                      confidence: { type: "number", minimum: 0, maximum: 1 },
+                      confidence: { type: "number" },
                       reason: { type: "string" }
                     },
                     required: ["id", "show", "confidence", "reason"],
@@ -161,6 +160,8 @@ ${titlesStr}
 
     if (!response.ok) {
       const status = response.status;
+      const errorBody = await response.text().catch(() => "");
+      console.error(`Groq API error ${status}:`, errorBody);
       if (status === 401 || status === 403) {
         return res.status(502).json({ results: {}, error: "auth_error" });
       }
