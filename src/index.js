@@ -1,6 +1,6 @@
 import express from "express";
 
-const AI_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const AI_MODEL = "openai/gpt-oss-120b";
 const DEFAULT_HIDE_CONFIDENCE_THRESHOLD = 0.75;
 const MAX_PREFERENCE_EXAMPLES = 8;
 
